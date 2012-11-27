@@ -190,47 +190,53 @@ static int cow_name(char const *name) {
 }
 
 static int do_cow_name(int dirfd, char const *name) {
-	int nfd, sfd;
-	void *addr;
-	struct stat stb;
-	char fpath[FLCLOW_MAXPATH];
+	int input_fd, temp_fd;
+	void *input_address;
+	struct stat input_stat, temp_stat;
+	char* temp_path;
 
-	if ((sfd = openat(dirfd, name, O_RDONLY, 0)) == -1)
+	if ((input_fd = openat(dirfd, name, O_RDONLY, 0)) == -1)
 		return -1;
-	if (fstat(sfd, &stb)) {
-		close(sfd);
-		return -1;
-	}
-	snprintf(fpath, sizeof(fpath) - 1, "%s,,+++", name);
-	if ((nfd = open(fpath, O_CREAT | O_EXCL | O_WRONLY, stb.st_mode)) == -1) {
-		close(sfd);
+	if (fstat(input_fd, &input_stat)) {
+		close(input_fd);
 		return -1;
 	}
-	if ((addr = mmap(NULL, stb.st_size, PROT_READ, MAP_PRIVATE,
-			 sfd, 0)) == MAP_FAILED) {
-		close(nfd);
-		unlink(fpath);
-		close(sfd);
+	temp_path = tempnam(0, "flcow");
+	if ((temp_fd = open(temp_path, O_CREAT | O_EXCL | O_WRONLY, input_stat.st_mode)) == -1) {
+		free(temp_path);
+		close(input_fd);
 		return -1;
 	}
-	if (write(nfd, addr, stb.st_size) != stb.st_size) {
-		munmap(addr, stb.st_size);
-		close(nfd);
-		unlink(fpath);
-		close(sfd);
+	if ((input_address = mmap(NULL, input_stat.st_size, PROT_READ, MAP_PRIVATE,
+			 input_fd, 0)) == MAP_FAILED) {
+		close(temp_fd);
+		unlink(temp_path);
+		free(temp_path);
+		close(input_fd);
 		return -1;
 	}
-	munmap(addr, stb.st_size);
-	close(sfd);
-	fchown(nfd, stb.st_uid, stb.st_gid);
-	close(nfd);
+	if (write(temp_fd, input_address, input_stat.st_size) == -1) {
+		munmap(input_address, input_stat.st_size);
+		close(temp_fd);
+		unlink(temp_path);
+		free(temp_path);
+		close(input_fd);
+		return -1;
+	}
+	munmap(input_address, input_stat.st_size);
+	close(input_fd);
+	fchown(temp_fd, input_stat.st_uid, input_stat.st_gid);
+	close(temp_fd);
 
+	// error case should be unlink(name) == -1?
 	if (unlink(name)) {
-		unlink(fpath);
+		unlink(temp_path);
+		free(temp_path);
 		return -1;
 	}
 
-	rename(fpath, name);
+	rename(temp_path, name);
+	free(temp_path);
 
 	return 0;
 }
