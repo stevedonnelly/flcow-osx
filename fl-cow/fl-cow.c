@@ -215,7 +215,8 @@ static int do_cow_name(int dirfd, char const *name) {
 		close(input_fd);
 		return -1;
 	}
-	if (write(temp_fd, input_address, input_stat.st_size) == -1) {
+	write(temp_fd, input_address, input_stat.st_size);
+	if (fstat(temp_fd, &temp_stat) == -1 || temp_stat.st_size != temp_stat.st_size) {
 		munmap(input_address, input_stat.st_size);
 		close(temp_fd);
 		unlink(temp_path);
@@ -228,8 +229,7 @@ static int do_cow_name(int dirfd, char const *name) {
 	fchown(temp_fd, input_stat.st_uid, input_stat.st_gid);
 	close(temp_fd);
 
-	// error case should be unlink(name) == -1?
-	if (unlink(name)) {
+	if (unlink(name) == -1) {
 		unlink(temp_path);
 		free(temp_path);
 		return -1;
