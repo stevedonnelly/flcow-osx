@@ -26,7 +26,9 @@
 
 #define _ATFILE_SOURCE
 
+#include <limits.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -148,6 +150,8 @@
 		}							\
 	FLCOW_MAP_ALIAS(sym, FREOPEN)
 
+#define MIN(a,b) ((b) < (a) ? (b) : (a))
+
 
 
 static int cow_name(char const *name) {
@@ -191,9 +195,7 @@ static int cow_name(char const *name) {
 
 static int do_cow_name(int dirfd, char const *name) {
 	int input_fd, temp_fd;
-	void *input_address;
 	struct stat input_stat, temp_stat;
-	char* temp_path;
 
 	if ((input_fd = openat(dirfd, name, O_RDONLY, 0)) == -1)
 		return -1;
@@ -201,31 +203,38 @@ static int do_cow_name(int dirfd, char const *name) {
 		close(input_fd);
 		return -1;
 	}
-	temp_path = tempnam(0, "flcow");
+	char* temp_path = tempnam(0, "flcow");
 	if ((temp_fd = open(temp_path, O_CREAT | O_EXCL | O_WRONLY, input_stat.st_mode)) == -1) {
 		free(temp_path);
 		close(input_fd);
 		return -1;
 	}
-	if ((input_address = mmap(NULL, input_stat.st_size, PROT_READ, MAP_PRIVATE,
-			 input_fd, 0)) == MAP_FAILED) {
-		close(temp_fd);
-		unlink(temp_path);
-		free(temp_path);
-		close(input_fd);
-		return -1;
+	off_t file_size = input_stat.st_size;
+	off_t offset = 0;
+	while(offset != file_size)
+	{
+		void* input_buffer;
+		size_t buffer_size = (size_t)MIN((uint64_t)(file_size - offset), (uint64_t)(SIZE_MAX/8));
+		if((input_buffer = mmap(NULL, buffer_size, PROT_READ, MAP_PRIVATE, input_fd, offset)) == MAP_FAILED)
+		{
+			close(temp_fd);
+			unlink(temp_path);
+			free(temp_path);
+			close(input_fd);
+			return -1;
+		}
+		size_t write_size = write(temp_fd, input_buffer, buffer_size);
+		munmap(input_buffer, buffer_size);
+		offset = offset + write_size;
 	}
-	write(temp_fd, input_address, input_stat.st_size);
-	if (fstat(temp_fd, &temp_stat) == -1 || temp_stat.st_size != temp_stat.st_size) {
-		munmap(input_address, input_stat.st_size);
-		close(temp_fd);
-		unlink(temp_path);
-		free(temp_path);
-		close(input_fd);
-		return -1;
-	}
-	munmap(input_address, input_stat.st_size);
 	close(input_fd);
+	
+	if (fstat(temp_fd, &temp_stat) == -1 || temp_stat.st_size != input_stat.st_size) {
+		close(temp_fd);
+		unlink(temp_path);
+		free(temp_path);
+		return -1;
+	}
 	fchown(temp_fd, input_stat.st_uid, input_stat.st_gid);
 	close(temp_fd);
 
