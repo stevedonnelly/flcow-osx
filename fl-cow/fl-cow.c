@@ -195,11 +195,11 @@ static int cow_name(char const *name) {
 
 static int do_cow_name(int dirfd, char const *name) {
 	int input_fd, temp_fd;
-	struct stat input_stat, temp_stat;
+	struct stat64 input_stat, temp_stat;
 
 	if ((input_fd = openat(dirfd, name, O_RDONLY, 0)) == -1)
 		return -1;
-	if (fstat(input_fd, &input_stat)) {
+	if (fstat64(input_fd, &input_stat)) {
 		close(input_fd);
 		return -1;
 	}
@@ -209,13 +209,13 @@ static int do_cow_name(int dirfd, char const *name) {
 		close(input_fd);
 		return -1;
 	}
-	off_t file_size = input_stat.st_size;
-	off_t offset = 0;
+	off64_t file_size = input_stat.st_size;
+	off64_t offset = 0;
 	while(offset != file_size)
 	{
 		void* input_buffer;
-		size_t buffer_size = (size_t)MIN((uint64_t)(file_size - offset), (uint64_t)(SIZE_MAX/8));
-		if((input_buffer = mmap(NULL, buffer_size, PROT_READ, MAP_PRIVATE, input_fd, offset)) == MAP_FAILED)
+		size_t buffer_size = (size_t)MIN((off64_t)(file_size - offset), (off64_t)(SIZE_MAX/8));
+		if((input_buffer = mmap64(NULL, buffer_size, PROT_READ, MAP_PRIVATE, input_fd, offset)) == MAP_FAILED)
 		{
 			close(temp_fd);
 			unlink(temp_path);
@@ -229,7 +229,7 @@ static int do_cow_name(int dirfd, char const *name) {
 	}
 	close(input_fd);
 	
-	if (fstat(temp_fd, &temp_stat) == -1 || temp_stat.st_size != input_stat.st_size) {
+	if (fstat64(temp_fd, &temp_stat) == -1 || temp_stat.st_size != input_stat.st_size) {
 		close(temp_fd);
 		unlink(temp_path);
 		free(temp_path);

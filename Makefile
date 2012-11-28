@@ -1,6 +1,6 @@
 
 COMPILER = gcc
-CFLAGS = -g -O2
+CFLAGS = -g -O2 -D_LARGEFILE64_SOURCE
 
 all: libs
 	
