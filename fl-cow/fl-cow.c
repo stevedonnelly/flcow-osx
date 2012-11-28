@@ -40,6 +40,7 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
+#include <regex.h>
 #include <stdio.h>
 #include <time.h>
 #include <errno.h>
@@ -57,7 +58,7 @@
 #endif
 
 #define REAL_LIBC RTLD_NEXT
-#define FLCLOW_MAXPATH 1024
+#define FLCOW_MAXPATH 1024
 
 #if defined(__APPLE__) || defined(__MACOSX__)
 #define AT_FDCWD -100
@@ -154,10 +155,38 @@
 
 
 
+static char path_pattern[FLCOW_MAXPATH] = "[";
+static char exclude_pattern[FLCOW_MAXPATH] = "[";
+static regex_t path_regex;
+static regex_t exclude_regex;
+
+void update_regex(const char* pattern, char* previous, regex_t* regex)
+{
+    if(strcmp(pattern, previous) != 0)
+    {
+        strncpy(previous, pattern, FLCOW_MAXPATH);
+        regcomp(regex, pattern, REG_NOSUB);
+    }
+}
+
+void update_regexes()
+{
+    const char* path = getenv("FLCOW_PATH");
+    update_regex(path, path_pattern, &path_regex);
+    const char* exclude = getenv("FLCOW_EXCLUDE");
+    update_regex(exclude, exclude_pattern, &exclude_regex);
+}
+
+int regex_match(const regex_t* regex, const char* text)
+{
+    return (regexec(regex, text, 0, 0, 0) == 0);
+}
+
+
 static int cow_name(char const *name) {
 	int nlen, len;
 	char const *home, *excld, *next;
-	char fpath[FLCLOW_MAXPATH];
+	char fpath[FLCOW_MAXPATH];
 
 	nlen = strlen(name);
 	if (*name != '/' && nlen < sizeof(fpath) - 1) {
@@ -180,14 +209,10 @@ static int cow_name(char const *name) {
 			nlen += len;
 		}
 	}
-	for (excld = getenv("FLCOW_PATH"); excld;) {
-		if (!(next = strchr(excld, ':')))
-			len = strlen(excld);
-		else
-			len = next - excld;
-		if (len && !strncmp(excld, name, len))
-			return 1;
-		excld = next ? next + 1: NULL;
+	update_regexes();
+	if(regex_match(&path_regex, name) && !regex_match(&exclude_regex, name))
+	{
+	    return 1;
 	}
 
 	return 0;
