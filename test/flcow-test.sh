@@ -11,6 +11,16 @@ export LD_PRELOAD=${lnx_lib}
 export FLCOW_PATH="^`pwd`"
 export FLCOW_EXCLUDE="\.noflcow$"
 
+if [ `uname -s` == "Linux" ]
+then
+    LINKCHECK="-c %h"
+elif [ `uname -s` == "Darwin" ]
+then
+    LINKCHECK="-f %l"
+else
+    echo "unknown platform: `uname -s`"
+fi
+
 fallocate -l 3G "./large_test_file"
 if [ $? -ne 0 ]
 then
@@ -18,7 +28,7 @@ then
 fi
 ln "./large_test_file" "./large_test_link"
 ln "./large_test_file" "./large_test_link.noflcow"
-stat -c %h "./large_test_file" "./large_test_link" "./large_test_link.noflcow" > "./link_counts"
+stat $LINKCHECK "./large_test_file" "./large_test_link" "./large_test_link.noflcow" > "./link_counts"
 links=`echo \`cat "./link_counts"\` | sed s/\ //g`
 echo "link counts: [$links], expected: [333]"
 if [ $links != "333" ]
@@ -27,7 +37,7 @@ then
 fi
 touch "./large_test_link"
 touch "./large_test_link.noflcow"
-stat -c %h "./large_test_file" "./large_test_link" "./large_test_link.noflcow" > "./link_counts"
+stat $LINKCHECK "./large_test_file" "./large_test_link" "./large_test_link.noflcow" > "./link_counts"
 links=`echo \`cat "./link_counts"\` | sed s/\ //g`
 echo "link counts: [$links], expected: [212]"
 if [ $links != "212" ]
