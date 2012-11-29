@@ -19,4 +19,11 @@ bins: objs
 test: all
 	pushd "test"; ./flcow-test.sh; popd
 
+clean:
+	rm -f */*.o
+	rm -f fl-cow/libflcow.*
+	rm -f test/flcow-test
+	rm -f *~
+	rm -f */*~
+
 
