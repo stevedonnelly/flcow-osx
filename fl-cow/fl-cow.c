@@ -200,6 +200,7 @@ static int cow_name(char const *name) {
 }
 
 static int do_cow_name(int dirfd, char const *name) {
+	char temp_path[FLCOW_MAXPATH];
 	int input_fd, temp_fd;
 	struct stat64 input_stat, temp_stat;
 
@@ -209,9 +210,8 @@ static int do_cow_name(int dirfd, char const *name) {
 		close(input_fd);
 		return -1;
 	}
-	char* temp_path = tempnam(0, "flcow");
+	snprintf(temp_path, FLCOW_MAXPATH, "%s,,+++", name);
 	if ((temp_fd = open(temp_path, O_CREAT | O_EXCL | O_WRONLY, input_stat.st_mode)) == -1) {
-		free(temp_path);
 		close(input_fd);
 		return -1;
 	}
@@ -225,7 +225,6 @@ static int do_cow_name(int dirfd, char const *name) {
 		{
 			close(temp_fd);
 			unlink(temp_path);
-			free(temp_path);
 			close(input_fd);
 			return -1;
 		}
@@ -238,7 +237,6 @@ static int do_cow_name(int dirfd, char const *name) {
 	if (fstat64(temp_fd, &temp_stat) == -1 || temp_stat.st_size != input_stat.st_size) {
 		close(temp_fd);
 		unlink(temp_path);
-		free(temp_path);
 		return -1;
 	}
 	fchown(temp_fd, input_stat.st_uid, input_stat.st_gid);
@@ -246,12 +244,9 @@ static int do_cow_name(int dirfd, char const *name) {
 
 	if (unlink(name) == -1) {
 		unlink(temp_path);
-		free(temp_path);
 		return -1;
 	}
-
 	rename(temp_path, name);
-	free(temp_path);
 
 	return 0;
 }
