@@ -155,33 +155,29 @@
 
 
 
-static char path_pattern[FLCOW_MAXPATH] = "[";
-static char exclude_pattern[FLCOW_MAXPATH] = "[";
+static char path_pattern[FLCOW_MAXPATH] = "";
+static char exclude_pattern[FLCOW_MAXPATH] = "";
 static regex_t path_regex;
 static regex_t exclude_regex;
 
 void update_regex(const char* pattern, char* previous, regex_t* regex)
 {
-    if(strcmp(pattern, previous) != 0)
+    if(pattern == 0)
+    {
+        strncpy(previous, "", FLCOW_MAXPATH);
+        regcomp(regex, "", REG_NOSUB);
+    }
+    else if(strcmp(pattern, previous) != 0)
     {
         strncpy(previous, pattern, FLCOW_MAXPATH);
         regcomp(regex, pattern, REG_NOSUB);
     }
 }
 
-void update_regexes()
+int regex_match(const char* pattern, const regex_t* regex, const char* text)
 {
-    const char* path = getenv("FLCOW_PATH");
-    update_regex(path, path_pattern, &path_regex);
-    const char* exclude = getenv("FLCOW_EXCLUDE");
-    update_regex(exclude, exclude_pattern, &exclude_regex);
+    return ((strlen(pattern) > 0) && regexec(regex, text, 1, 0, 0) == 0);
 }
-
-int regex_match(const regex_t* regex, const char* text)
-{
-    return (regexec(regex, text, 0, 0, 0) == 0);
-}
-
 
 static int cow_name(char const *name) {
 	int nlen, len;
