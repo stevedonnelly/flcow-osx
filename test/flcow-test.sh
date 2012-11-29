@@ -12,6 +12,10 @@ export FLCOW_PATH="^`pwd`"
 export FLCOW_EXCLUDE="\.noflcow$"
 
 fallocate -l 3G "./large_test_file"
+if [ $? -ne 0 ]
+then
+    timeout 15 cat /dev/zero > "./large_test_link"
+fi
 ln "./large_test_file" "./large_test_link"
 ln "./large_test_file" "./large_test_link.noflcow"
 stat -c %h "./large_test_file" "./large_test_link" "./large_test_link.noflcow" > "./link_counts"
