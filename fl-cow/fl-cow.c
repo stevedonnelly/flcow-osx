@@ -174,43 +174,28 @@ void update_regex(const char* pattern, char* previous, regex_t* regex)
     }
 }
 
+void update_regexes()
+{
+    const char* path = getenv("FLCOW_PATH");
+    update_regex(path, path_pattern, &path_regex);
+    const char* exclude = getenv("FLCOW_EXCLUDE");
+    update_regex(exclude, exclude_pattern, &exclude_regex);
+}
+
 int regex_match(const char* pattern, const regex_t* regex, const char* text)
 {
+    DPRINTF("match \"%s\" with pattern \"%s\" : %d\n", text, pattern, regexec(regex, text, 1, 0, 0) == 0);
     return ((strlen(pattern) > 0) && regexec(regex, text, 1, 0, 0) == 0);
 }
 
 static int cow_name(char const *name) {
-	int nlen, len;
-	char const *home, *excld, *next;
-	char fpath[FLCOW_MAXPATH];
-
-	nlen = strlen(name);
-	if (*name != '/' && nlen < sizeof(fpath) - 1) {
-		if (name[0] == '~' && name[1] == '/') {
-			if ((home = getenv("HOME")) != NULL) {
-				strncpy(fpath, home, sizeof(fpath) - 1);
-				name += 2;
-				nlen -= 2;
-			} else
-				fpath[0] = '\0';
-		} else {
-			if (!getcwd(fpath, sizeof(fpath) - 1 - nlen))
-				fpath[0] = '\0';
-		}
-		if ((len = strlen(fpath)) + nlen + 2 < sizeof(fpath)) {
-			if (len && fpath[len - 1] != '/')
-				fpath[len++] = '/';
-			memcpy(fpath + len, name, nlen + 1);
-			name = fpath;
-			nlen += len;
-		}
-	}
+	char normalized_path[FLCOW_MAXPATH];
+	realpath(name, normalized_path);
 	update_regexes();
-	if(regex_match(&path_regex, name) && !regex_match(&exclude_regex, name))
+	if(regex_match(path_pattern, &path_regex, normalized_path) && !regex_match(exclude_pattern, &exclude_regex, normalized_path))
 	{
 	    return 1;
 	}
-
 	return 0;
 }
 
