@@ -165,12 +165,12 @@ void update_regex(const char* pattern, char* previous, regex_t* regex)
     if(pattern == 0)
     {
         strncpy(previous, "", FLCOW_MAXPATH);
-        regcomp(regex, "", REG_NOSUB);
+        regcomp(regex, "", REG_EXTENDED | REG_NOSUB);
     }
     else if(strcmp(pattern, previous) != 0)
     {
         strncpy(previous, pattern, FLCOW_MAXPATH);
-        regcomp(regex, pattern, REG_NOSUB);
+        regcomp(regex, pattern, REG_EXTENDED | REG_NOSUB);
     }
 }
 
